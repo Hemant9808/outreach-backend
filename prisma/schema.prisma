@@ -1,0 +1,238 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum CampaignStatus {
+  UPLOADED
+  EXTRACTING
+  READY
+  FAILED
+}
+
+enum SendMode {
+  IMMEDIATE
+  SCHEDULED
+  RECURRING
+}
+
+enum LeadStatus {
+  EXTRACTED
+  NO_EMAIL
+  QUEUED
+  SENT
+  FAILED
+  COMPLETED
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  email        String     @unique
+  passwordHash String
+  name         String
+  phone        String?
+  title        String?
+  skills       String?    @db.Text
+  about        String?    @db.Text
+  linkedin     String?
+  resumeUrl    String?
+  resumePublicId String?
+  resumeFilename String?
+  timezone     String     @default("Asia/Kolkata")
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  campaigns    Campaign[]
+  emailSettings EmailSettings?
+  mcpSettings   McpSettings?
+  companies     Company[]
+  contacts      Contact[]
+}
+
+enum ContactStatus {
+  NEW
+  CONTACTED
+  REPLIED
+  INTERVIEWING
+  OFFER
+  NOT_INTERESTED
+  DO_NOT_CONTACT
+}
+
+enum RecruiterType {
+  IN_HOUSE
+  AGENCY
+  FREELANCE
+  HIRING_MANAGER
+  UNKNOWN
+}
+
+model Company {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  nameKey   String
+  domain    String?
+  website   String?
+  linkedin  String?
+  industry  String?
+  size      String?
+  location  String?
+  notes     String?   @db.Text
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  contacts  Contact[]
+
+  @@unique([userId, nameKey])
+  @@index([userId, domain])
+}
+
+model Contact {
+  id                Int           @id @default(autoincrement())
+  userId            Int
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyId         Int?
+  company           Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  name              String?
+  email             String
+  phone             String?
+  position          String?
+  seniority         Int?
+  department        String?
+  recruiterType     RecruiterType @default(UNKNOWN)
+  hiringFor         Json?
+  hiresForCompanies Json?
+  location          String?
+  linkedin          String?
+  tags              Json?
+  notes             String?       @db.Text
+  source            String?
+  sourceUrl         String?       @db.Text
+  status            ContactStatus @default(NEW)
+  contactCount      Int           @default(0)
+  lastContactedAt   DateTime?
+  lastRepliedAt     DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  leads             Lead[]
+
+  @@unique([userId, email])
+  @@index([userId, companyId])
+  @@index([userId, status])
+}
+
+model McpSettings {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @unique
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled    Boolean   @default(true)
+  keyEnc     String?   @db.Text
+  publicUrl  String?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model EmailSettings {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  host        String
+  port        Int      @default(587)
+  secure      Boolean  @default(false)
+  username    String
+  passwordEnc String   @db.Text
+  fromName    String?
+  fromEmail   String?
+  replyTo     String?
+  verifiedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Campaign {
+  id                     Int            @id @default(autoincrement())
+  userId                 Int
+  user                   User           @relation(fields: [userId], references: [id])
+  status                 CampaignStatus @default(UPLOADED)
+  sendMode               SendMode
+  scheduledAt            DateTime?
+  recurrenceIntervalDays Int?
+  maxSends               Int            @default(3)
+  error                  String?        @db.Text
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  uploads                Upload[]
+  leads                  Lead[]
+
+  @@index([userId])
+}
+
+model Upload {
+  id           Int      @id @default(autoincrement())
+  campaignId   Int
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  cloudinaryId String
+  url          String   @db.Text
+  mimeType     String
+  originalName String
+  createdAt    DateTime @default(now())
+  leads        Lead[]
+}
+
+model Lead {
+  id         Int        @id @default(autoincrement())
+  campaignId Int
+  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  uploadId   Int?
+  upload     Upload?    @relation(fields: [uploadId], references: [id])
+  contactId  Int?
+  contact    Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  hrName     String?
+  hrEmail    String?
+  company    String?
+  role       String?
+  jdSummary  String?    @db.Text
+  subject    String?    @db.VarChar(500)
+  body       String?    @db.Text
+  status     LeadStatus @default(EXTRACTED)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  schedules  Schedule[]
+  logs       SendLog[]
+
+  @@index([campaignId])
+  @@index([hrEmail])
+  @@index([contactId])
+}
+
+model Schedule {
+  id           Int      @id @default(autoincrement())
+  leadId       Int
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  nextRunAt    DateTime
+  intervalDays Int?
+  sendCount    Int      @default(0)
+  maxSends     Int      @default(3)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([active, nextRunAt])
+}
+
+model SendLog {
+  id         Int      @id @default(autoincrement())
+  leadId     Int
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sentAt     DateTime @default(now())
+  status     String
+  error      String?  @db.Text
+  providerId String?
+
+  @@index([leadId])
+}
