@@ -10,7 +10,7 @@ async function bootstrap() {
   app.useBodyParser('json', { limit: '40mb' });
   const allowedOrigins = [
     'http://localhost:5173',
-    'https://outreach-frontend-dybpzpa4z-hemant-kumars-projects-ca694d0b.vercel.app',
+    'https://outreach-frontend-lake.vercel.app',
     process.env.FRONTEND_URL,
   ].filter((origin, index, list): origin is string =>
     Boolean(origin) && list.indexOf(origin) === index,
