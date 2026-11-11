@@ -8,8 +8,15 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useBodyParser('json', { limit: '40mb' });
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'https://outreach-frontend-dybpzpa4z-hemant-kumars-projects-ca694d0b.vercel.app',
+    process.env.FRONTEND_URL,
+  ].filter((origin, index, list): origin is string =>
+    Boolean(origin) && list.indexOf(origin) === index,
+  );
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: allowedOrigins,
     credentials: true,
   });
   app.useGlobalPipes(
